@@ -65,3 +65,76 @@ FROM discount_data
 GROUP BY category_name
 ORDER BY market_avg_discount DESC;
 
+
+-- View 3: 30-Day Stockout & Availability Tracker
+CREATE OR REPLACE VIEW vw_30day_availability_tracker AS
+WITH last_30_days AS (
+    SELECT price_date 
+    FROM fact_price_history
+    GROUP BY price_date
+    ORDER BY price_date DESC
+    LIMIT 30
+)
+SELECT 
+    p.product_name,
+    p.brand,
+    c.category_name,
+    r.retailer_name,
+    COUNT(*) AS total_days_checked,
+    SUM(CASE WHEN f.is_available = FALSE THEN 1 ELSE 0 END) AS days_out_of_stock,
+    ROUND(
+        (SUM(CASE WHEN f.is_available = FALSE THEN 1 ELSE 0 END)::NUMERIC / COUNT(*)) * 100, 
+        2
+    ) AS out_of_stock_pct
+FROM fact_price_history f
+JOIN dim_product p ON f.product_id = p.product_id
+JOIN dim_category c ON p.category_id = c.category_id
+JOIN dim_retailer r ON f.retailer_id = r.retailer_id
+WHERE f.price_date IN (SELECT price_date FROM last_30_days)
+GROUP BY 
+    p.product_name,
+    p.brand,
+    c.category_name,
+    r.retailer_name
+HAVING SUM(CASE WHEN f.is_available = FALSE THEN 1 ELSE 0 END) > 0
+ORDER BY out_of_stock_pct DESC;
+
+
+
+
+-- View 4: 30-Day Selling Price Volatility Index
+CREATE OR REPLACE VIEW vw_price_volatility AS
+WITH last_30_days AS (
+    SELECT price_date 
+    FROM fact_price_history
+    GROUP BY price_date
+    ORDER BY price_date DESC
+    LIMIT 30
+),
+price_stats AS (
+    SELECT 
+        f.product_id,
+        f.retailer_id,
+        MIN(f.selling_price) AS min_price,
+        MAX(f.selling_price) AS max_price,
+        AVG(f.selling_price) AS avg_price,
+        STDDEV_SAMP(f.selling_price) AS price_stddev
+    FROM fact_price_history f
+    WHERE f.price_date IN (SELECT price_date FROM last_30_days)
+      AND f.is_available = TRUE
+    GROUP BY f.product_id, f.retailer_id
+)
+SELECT 
+    p.product_name,
+    c.category_name,
+    r.retailer_name,
+    ROUND(s.min_price, 2) AS min_price_30d,
+    ROUND(s.max_price, 2) AS max_price_30d,
+    ROUND(s.avg_price, 2) AS avg_price_30d,
+    ROUND((s.price_stddev / s.avg_price) * 100, 2) AS volatility_index_pct
+FROM price_stats s
+JOIN dim_product p ON s.product_id = p.product_id
+JOIN dim_category c ON p.category_id = c.category_id
+JOIN dim_retailer r ON s.retailer_id = r.retailer_id
+WHERE s.price_stddev IS NOT NULL
+ORDER BY volatility_index_pct DESC;
