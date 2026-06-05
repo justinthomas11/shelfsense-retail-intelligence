@@ -1,0 +1,15 @@
+# Database Drivers & ORM
+psycopg2-binary>=2.9.9
+SQLAlchemy>=2.0.25
+
+# Data Manipulation & Analytics
+pandas>=2.2.0
+numpy>=1.26.3
+
+# Web Scraping & HTML Parsing
+beautifulsoup4>=4.12.3
+playwright>=1.41.0
+requests>=2.31.0
+
+# Ingestion Scheduling & Orchestration
+APScheduler>=3.10.4
