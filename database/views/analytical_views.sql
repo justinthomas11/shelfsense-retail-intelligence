@@ -39,3 +39,29 @@ ORDER BY category_name, product_name;
 
 
 -- View 2: Weekly Average Discount Analysis
+CREATE OR REPLACE VIEW vw_weekly_discount_analysis AS
+WITH last_7_days AS(
+    select price_date from fact_price_history group by price_date order by price_date desc limit 7),
+    discount_data AS (SELECT 
+        c.category_name,
+        r.retailer_name,
+        f.discount_pct,
+        f.is_available
+    FROM fact_price_history f
+    JOIN dim_product p ON f.product_id = p.product_id
+    JOIN dim_category c ON p.category_id = c.category_id
+    JOIN dim_retailer r ON f.retailer_id = r.retailer_id
+    WHERE f.price_date IN (SELECT price_date FROM last_7_days)
+      AND f.is_available = TRUE
+)
+SELECT 
+    category_name,
+    ROUND(AVG(CASE WHEN retailer_name = 'BigBasket' THEN discount_pct END), 2) AS bigbasket_avg_discount,
+    ROUND(AVG(CASE WHEN retailer_name = 'Blinkit' THEN discount_pct END), 2) AS blinkit_avg_discount,
+    ROUND(AVG(CASE WHEN retailer_name = 'Zepto' THEN discount_pct END), 2) AS zepto_avg_discount,
+    ROUND(AVG(CASE WHEN retailer_name = 'JioMart' THEN discount_pct END), 2) AS jiomart_avg_discount,
+    ROUND(AVG(discount_pct), 2) AS market_avg_discount
+FROM discount_data
+GROUP BY category_name
+ORDER BY market_avg_discount DESC;
+
