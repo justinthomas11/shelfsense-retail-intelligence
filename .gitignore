@@ -29,3 +29,6 @@ Thumbs.db
 
 # Power BI
 *.pbix
+
+# Pipeline logs
+logs/

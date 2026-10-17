@@ -24,8 +24,6 @@ from decimal import Decimal, ROUND_HALF_UP
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import psycopg2
-from config.db_config import DB_CONFIG
 from data_simulator.product_catalog import PRODUCT_CATALOG
 
 # ── Configuration ──────────────────────────────────────────────────────
@@ -211,6 +209,10 @@ def main():
     print(f"  Retailers:   {len(RETAILER_STRATEGIES)}")
     print(f"  Expected rows: ~{SIMULATION_DAYS * len(PRODUCT_CATALOG) * len(RETAILER_STRATEGIES):,}")
     print()
+
+    # Imported here so the pricing logic above can be reused without a DB
+    import psycopg2
+    from config.db_config import DB_CONFIG
 
     conn = psycopg2.connect(**DB_CONFIG)
     cur = conn.cursor()
