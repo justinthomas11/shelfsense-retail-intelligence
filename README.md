@@ -57,14 +57,14 @@ In modern retail, **pricing is the single biggest lever for revenue and margin**
 │               ▼                                                 │
 │     ┌───────────────────┐    ┌────────────────┐                 │
 │     │ fact_price_history │    │ fact_macro_cpi  │                │
-│     │ (500+ SKUs daily)  │    │ (govt inflation)│                │
+│     │ (75 SKUs · daily)  │    │ (govt inflation)│                │
 │     └───────────────────┘    └────────────────┘                 │
 └──────────────────────────┬──────────────────────────────────────┘
                            │
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                 ANALYTICAL SQL LAYER                             │
-│  20+ queries: window functions, CTEs, conditional aggregation   │
+│  20 views: window functions, CTEs, conditional aggregation      │
 │  Promotion detection · Price elasticity · Competitive gaps      │
 │  Demand proxies · Market basket correlation · Discount patterns │
 └──────────────────────────┬──────────────────────────────────────┘
@@ -85,14 +85,14 @@ In modern retail, **pricing is the single biggest lever for revenue and margin**
 ### 1. Automated Daily Price Tracking
 - Modular scrapers for **BigBasket**, **Blinkit**, **Zepto**, and **JioMart**
 - Scheduled via `APScheduler` to run daily, building a growing time-series dataset
-- Tracks **500+ SKUs** across groceries, FMCG, dairy, snacks, and personal care
+- Tracks **75 SKUs** (extensible via the product catalog) across groceries, FMCG, dairy, snacks, and personal care
 
 ### 2. Normalized PostgreSQL Schema
 - Star-schema design with dimension tables (`dim_retailer`, `dim_product`, `dim_category`) and fact tables (`fact_price_history`, `fact_macro_cpi`)
 - Indexed for fast analytical queries across millions of price observations
 - Full price history with timestamps — no data is ever overwritten
 
-### 3. Interview-Ready SQL Analytics (20+ Queries)
+### 3. Interview-Ready SQL Analytics (20 Queries)
 | Query | Technique |
 |---|---|
 | Promotion detection (>15% price drops) | `LAG()` window function |
@@ -135,40 +135,51 @@ In modern retail, **pricing is the single biggest lever for revenue and margin**
 ```
 shelfsense-retail-intelligence/
 │
-├── config/                     # Database connection & environment settings
-│   └── db_config.py
+├── config/                     # Database connection settings
+│   └── db_config.example.py    # copy to db_config.py (gitignored)
 │
 ├── database/
-│   ├── schema/                 # DDL scripts — CREATE TABLE statements
-│   │   └── 01_create_tables.sql
-│   └── views/                  # Materialized views for Power BI
+│   ├── schema/                 # DDL + dimension seed scripts
+│   │   ├── 01_create_tables.sql
+│   │   └── 02_seed_dimensions.sql
+│   └── views/                  # 20 analytical views for Power BI
 │       └── analytical_views.sql
 │
 ├── scrapers/                   # One module per retailer
+│   ├── base_scraper.py         # fetching, retries, parsing, catalog matching
 │   ├── bigbasket_scraper.py
-│   ├── blinkit_scraper.py
-│   ├── zepto_scraper.py
+│   ├── blinkit_scraper.py      # Playwright (JS-rendered)
+│   ├── zepto_scraper.py        # Playwright (JS-rendered)
 │   └── jiomart_scraper.py
 │
 ├── data_simulator/             # Realistic data generation (fallback)
-│   └── generate_data.py
+│   ├── product_catalog.py      # 75 SKUs across 20 categories
+│   ├── simulate_prices.py      # 90 days of price history
+│   └── load_cpi.py             # monthly CPI / inflation series
 │
-├── pipeline/                   # Orchestration & scheduling
-│   └── scheduler.py
+├── pipeline/                   # Extract → validate → load, scheduled daily
+│   ├── scheduler.py
+│   ├── validation.py
+│   ├── loader.py
+│   └── simulated_source.py
 │
-├── sql_queries/                # 20+ standalone analytical queries
-│   ├── 01_promotion_detection.sql
-│   ├── 02_competitive_price_gap.sql
-│   ├── 03_discount_frequency.sql
+├── sql_queries/                # 20 standalone, documented analytical queries
+│   ├── 01_daily_competitor_pricing.sql
+│   ├── 05_promotion_detection.sql
+│   ├── 11_promotional_calendar.sql
 │   └── ...
 │
-├── powerbi/                    # Dashboard documentation & exports
+├── scripts/
+│   └── setup_database.py       # one-command DB bootstrap
+│
+├── powerbi/                    # Dashboard build guide & exports
 │   ├── dashboard_guide.md
 │   └── screenshots/
 │
-├── notebooks/                  # Jupyter EDA & exploration
+├── notebooks/                  # Jupyter EDA
 │   └── data_exploration.ipynb
 │
+├── tests/                      # pytest suite (runs offline, no DB needed)
 ├── requirements.txt
 ├── docker-compose.yml          # PostgreSQL via Docker (optional)
 └── README.md
@@ -186,6 +197,7 @@ shelfsense-retail-intelligence/
 | **Scheduling** | APScheduler | Automated daily pipeline execution |
 | **Data Processing** | Pandas, NumPy | Transformation, validation, loading |
 | **ORM / DB Driver** | SQLAlchemy, psycopg2 | Python ↔ PostgreSQL connectivity |
+| **Testing** | pytest | Offline unit tests for scrapers, pipeline and SQL |
 | **Visualization** | Power BI | Executive & operational dashboards |
 | **Version Control** | Git + GitHub | Code versioning & collaboration |
 
@@ -212,16 +224,46 @@ source venv/bin/activate        # Linux/Mac
 
 # Install dependencies
 pip install -r requirements.txt
+playwright install chromium     # only needed for live Blinkit/Zepto scraping
 
-# Set up PostgreSQL database
-psql -U postgres -f database/schema/01_create_tables.sql
+# Configure the database connection
+cp config/db_config.example.py config/db_config.py
+cp .env.example .env            # then edit your credentials
 
-# Run the data pipeline
-python pipeline/scheduler.py
+# Start PostgreSQL (skip if installed locally)
+docker compose up -d
 
-# Create analytical views
-psql -U postgres -d shelfsense -f database/views/analytical_views.sql
+# Create tables, load 90 days of simulated data, and build all views
+python scripts/setup_database.py --with-data
 ```
+
+### Running the pipeline
+
+```bash
+# One-off run with live scrapers, simulating any retailer that returns no data
+python pipeline/scheduler.py --once --fallback-simulate
+
+# Offline / demo run
+python pipeline/scheduler.py --once --source simulate
+
+# Long-running daily schedule (06:00 IST by default)
+python pipeline/scheduler.py --hour 6 --minute 0
+```
+
+Run logs are written to `logs/pipeline.log`.
+
+> **About the data:** retailer storefronts change markup often and some block automated traffic, so the scrapers keep their CSS selectors in a single `SELECTORS` dict per retailer for easy updates. The bundled dataset is produced by the simulator, which models each retailer's discount strategy, weekend and sale-event promotions, stockouts and inflation. The insights above describe what the platform can surface; they are not claims about real retailer behaviour.
+
+### Running the tests
+
+```bash
+pytest
+```
+
+### Exploring the data
+
+- **Notebook:** `notebooks/data_exploration.ipynb` charts discounts, cheapest-retailer share, price indices, volatility and inflation strategy straight from the views.
+- **Power BI:** see [`powerbi/dashboard_guide.md`](powerbi/dashboard_guide.md) for the connection steps, the visual-to-view mapping for all three pages, and DAX measures.
 
 ---
 
