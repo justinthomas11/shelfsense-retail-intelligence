@@ -45,9 +45,9 @@ CREATE TABLE IF NOT EXISTS fact_macro_cpi (
     UNIQUE(report_month, category_name)
 );
 
-CREATE INDEX idx_price_date ON fact_price_history(price_date);
-CREATE INDEX idx_price_product ON fact_price_history(product_id);
-CREATE INDEX idx_price_retailer ON fact_price_history(retailer_id);
-CREATE INDEX idx_price_product_retailer_date 
+CREATE INDEX IF NOT EXISTS idx_price_date ON fact_price_history(price_date);
+CREATE INDEX IF NOT EXISTS idx_price_product ON fact_price_history(product_id);
+CREATE INDEX IF NOT EXISTS idx_price_retailer ON fact_price_history(retailer_id);
+CREATE INDEX IF NOT EXISTS idx_price_product_retailer_date 
     ON fact_price_history(product_id, retailer_id, price_date);
-CREATE INDEX idx_cpi_month ON fact_macro_cpi(report_month);
+CREATE INDEX IF NOT EXISTS idx_cpi_month ON fact_macro_cpi(report_month);

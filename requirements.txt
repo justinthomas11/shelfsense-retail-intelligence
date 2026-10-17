@@ -13,3 +13,6 @@ requests>=2.31.0
 
 # Ingestion Scheduling & Orchestration
 APScheduler>=3.10.4
+
+# Configuration
+python-dotenv>=1.0.0
