@@ -8,6 +8,7 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://postgresql.org)
 [![Power BI](https://img.shields.io/badge/Power_BI-Dashboard-F2C811?style=for-the-badge&logo=powerbi&logoColor=black)](https://powerbi.microsoft.com)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/justinthomas11/shelfsense-retail-intelligence/ci.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/justinthomas11/shelfsense-retail-intelligence/actions/workflows/ci.yml)
 
 ---
 
@@ -183,7 +184,8 @@ shelfsense-retail-intelligence/
 ├── notebooks/                  # Jupyter EDA
 │   └── data_exploration.ipynb
 │
-├── tests/                      # pytest suite (runs offline, no DB needed)
+├── tests/                      # pytest: offline unit tests + DB integration tests
+├── .github/workflows/ci.yml    # CI: build warehouse, run pipeline, run tests
 ├── requirements.txt
 ├── docker-compose.yml          # PostgreSQL via Docker (optional)
 └── README.md
@@ -218,7 +220,7 @@ shelfsense-retail-intelligence/
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/shelfsense-retail-intelligence.git
+git clone https://github.com/justinthomas11/shelfsense-retail-intelligence.git
 cd shelfsense-retail-intelligence
 
 # Create virtual environment
@@ -263,6 +265,8 @@ Run logs are written to `logs/pipeline.log`.
 ```bash
 pytest
 ```
+
+Unit tests run offline. Integration tests (every view returns rows, data-quality checks) run automatically when the configured database is reachable and are skipped otherwise. CI runs the full stack on every push: it builds the warehouse on PostgreSQL 16, runs the pipeline, then runs all tests.
 
 ### Exploring the data
 

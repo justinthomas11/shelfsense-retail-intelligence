@@ -1,16 +1,17 @@
 version: '3.8'
 
+# Credentials come from .env (see .env.example); defaults are for local dev only.
 services:
   db:
     image: postgres:16-alpine
     container_name: shelfsense_postgres
     restart: always
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: "2977"
-      POSTGRES_DB: shelfsense
+      POSTGRES_USER: ${SHELFSENSE_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${SHELFSENSE_DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${SHELFSENSE_DB_NAME:-shelfsense}
     ports:
-      - "5432:5432"
+      - "${SHELFSENSE_DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
 

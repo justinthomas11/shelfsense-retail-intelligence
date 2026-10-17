@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      SHELFSENSE_DB_HOST: localhost
+      SHELFSENSE_DB_PORT: 5432
+      SHELFSENSE_DB_USER: postgres
+      SHELFSENSE_DB_PASSWORD: postgres
+      SHELFSENSE_DB_NAME: shelfsense
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Configure database connection
+        run: cp config/db_config.example.py config/db_config.py
+
+      - name: Build warehouse with simulated data
+        run: python scripts/setup_database.py --with-data
+
+      - name: Run daily pipeline (simulated source)
+        run: python pipeline/scheduler.py --once --source simulate
+
+      - name: Run tests (unit + integration)
+        run: pytest -v
