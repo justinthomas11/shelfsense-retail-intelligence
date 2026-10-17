@@ -176,6 +176,10 @@ shelfsense-retail-intelligence/
 │   ├── dashboard_guide.md
 │   └── screenshots/
 │
+├── dashboard/                  # Streamlit app (Executive / Operational / Trends)
+│   ├── app.py
+│   └── views/
+│
 ├── notebooks/                  # Jupyter EDA
 │   └── data_exploration.ipynb
 │
@@ -198,7 +202,7 @@ shelfsense-retail-intelligence/
 | **Data Processing** | Pandas, NumPy | Transformation, validation, loading |
 | **ORM / DB Driver** | SQLAlchemy, psycopg2 | Python ↔ PostgreSQL connectivity |
 | **Testing** | pytest | Offline unit tests for scrapers, pipeline and SQL |
-| **Visualization** | Power BI | Executive & operational dashboards |
+| **Visualization** | Streamlit + Plotly, Power BI | Interactive executive, operational & trend dashboards |
 | **Version Control** | Git + GitHub | Code versioning & collaboration |
 
 ---
@@ -262,6 +266,10 @@ pytest
 
 ### Exploring the data
 
+- **Streamlit dashboard:** run `streamlit run dashboard/app.py` and open http://localhost:8501. It has three pages, all sharing the same category and retailer filters:
+  - **Executive:** KPI row, cheapest-retailer share, retailer price-premium matrix, discount vs CPI inflation, demand signals
+  - **Operational:** today's price board with the lowest price highlighted, per-product price history, price-drop alerts, stockout watchlist, most volatile SKUs
+  - **Trends:** category price index, weekly discount by retailer, week-over-week and day-of-week heatmaps, promotional calendar
 - **Notebook:** `notebooks/data_exploration.ipynb` charts discounts, cheapest-retailer share, price indices, volatility and inflation strategy straight from the views.
 - **Power BI:** see [`powerbi/dashboard_guide.md`](powerbi/dashboard_guide.md) for the connection steps, the visual-to-view mapping for all three pages, and DAX measures.
 

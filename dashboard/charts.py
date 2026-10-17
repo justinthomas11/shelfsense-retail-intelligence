@@ -16,6 +16,11 @@ _RETAILER_COLORS = {
     "light": ["#2a78d6", "#eb6834", "#1baf7a", "#eda100"],
     "dark": ["#3987e5", "#d95926", "#199e70", "#c98500"],
 }
+_CATEGORICAL = {  # full 8-slot sequence, for non-retailer series (e.g. categories)
+    "light": ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"],
+    "dark": ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"],
+}
+MAX_SERIES = 8
 _DIVERGING = {  # blue (cheaper / price fell) ↔ gray ↔ red (pricier / price rose)
     "light": ["#2a78d6", "#f0efec", "#e34948"],
     "dark": ["#3987e5", "#383835", "#e66767"],
@@ -33,6 +38,11 @@ def _mode():
 
 def retailer_colors():
     return dict(zip(RETAILERS, _RETAILER_COLORS[_mode()]))
+
+
+def categorical_colors(names):
+    """Fixed-order colours for up to MAX_SERIES non-retailer series."""
+    return dict(zip(names, _CATEGORICAL[_mode()]))
 
 
 def single_color():
@@ -66,5 +76,5 @@ def show(fig, **kwargs):
                     config={"displaylogo": False})
 
 
-__all__ = ["go", "retailer_colors", "single_color", "diverging_scale",
+__all__ = ["go", "retailer_colors", "categorical_colors", "MAX_SERIES", "single_color", "diverging_scale",
            "SEQUENTIAL_BLUE", "style", "show"]
