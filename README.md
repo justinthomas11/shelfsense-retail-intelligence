@@ -1,133 +1,201 @@
 <div align="center">
 
-# ShelfSense — Competitive Retail Price Intelligence & Market Analytics Platform
+# ShelfSense
 
-**Automated price tracking · Promotion detection · Inflation-adjusted analytics · Executive dashboards**
+### Competitive Retail Price Intelligence for Indian Grocery & Quick-Commerce
+
+**Daily price tracking · Promotion detection · Inflation-adjusted analytics · Interactive dashboards**
 
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://postgresql.org)
-[![Power BI](https://img.shields.io/badge/Power_BI-Dashboard-F2C811?style=for-the-badge&logo=powerbi&logoColor=black)](https://powerbi.microsoft.com)
-[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
+[![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io)
 [![CI](https://img.shields.io/github/actions/workflow/status/justinthomas11/shelfsense-retail-intelligence/ci.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/justinthomas11/shelfsense-retail-intelligence/actions/workflows/ci.yml)
-
----
-
-*A data analytics project that replicates competitive price intelligence workflows used by major retail corporations — built entirely from publicly available Indian retail market data.*
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
 </div>
 
 ---
 
-## The Problem
+## Overview
 
-In modern retail, **pricing is the single biggest lever for revenue and margin**. Companies like Target, Walmart, and Amazon run dedicated analytics teams that:
+Pricing is one of the biggest levers a retailer has on revenue and margin. Large retailers run dedicated teams to monitor competitor prices, spot promotions, and judge whether price moves are driven by strategy or by inflation.
 
-- Monitor competitor prices daily across thousands of SKUs
-- Detect promotional patterns and discount strategies
-- Correlate pricing shifts with macroeconomic signals (inflation, CPI)
-- Surface actionable insights to merchandising and pricing teams
+**ShelfSense is an end-to-end version of that workflow** for four Indian retailers: **BigBasket, Blinkit, Zepto and JioMart**. It covers:
 
-**ShelfSense replicates this exact analytical infrastructure** using data from India's fastest-growing retail and quick-commerce platforms.
+- **Ingestion**: modular scrapers plus a scheduled pipeline that validates, deduplicates and loads prices daily
+- **Warehouse**: a PostgreSQL star schema holding price history and CPI inflation data
+- **Analytics**: 20 SQL views built with window functions, CTEs, and gap-and-island detection
+- **Presentation**: a three-page Streamlit dashboard, an EDA notebook and a Power BI build guide
+- **Quality**: 63 tests and a CI pipeline that builds the full stack on every push
+
+> **About the data:** retailer sites change markup often and some block automated traffic, so the bundled dataset comes from a simulator. It covers 75 SKUs × 4 retailers × 90 days (27,000 rows) and models each retailer's discount strategy, weekend and sale-event promotions, stockouts and inflation. The CPI series is also simulated. The findings below describe this dataset, not real retailer behaviour.
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        DATA SOURCES                             │
-│  BigBasket · Blinkit · Zepto · JioMart · Government CPI Data   │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    INGESTION PIPELINE                            │
-│  Python Scrapers (BeautifulSoup / Playwright)                   │
-│  APScheduler — automated daily extraction                       │
-│  Data validation & deduplication layer                          │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                   PostgreSQL DATA WAREHOUSE                     │
-│  ┌──────────┐  ┌──────────────┐  ┌────────────────────┐        │
-│  │dim_retail│  │ dim_product  │  │ dim_category        │        │
-│  └────┬─────┘  └──────┬───────┘  └─────────┬──────────┘        │
-│       │               │                    │                    │
-│       └───────┬───────┘────────────────────┘                    │
-│               ▼                                                 │
-│     ┌───────────────────┐    ┌────────────────┐                 │
-│     │ fact_price_history │    │ fact_macro_cpi  │                │
-│     │ (75 SKUs · daily)  │    │ (govt inflation)│                │
-│     └───────────────────┘    └────────────────┘                 │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                 ANALYTICAL SQL LAYER                             │
-│  20 views: window functions, CTEs, conditional aggregation      │
-│  Promotion detection · Price elasticity · Competitive gaps      │
-│  Demand proxies · Market basket correlation · Discount patterns │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    POWER BI DASHBOARD                            │
-│  Executive View — Market share proxy, inflation impact          │
-│  Operational View — Daily price alerts by SKU                   │
-│  Trend View — 90-day pricing history by retailer                │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                         DATA SOURCES                         │
+│  BigBasket · Blinkit · Zepto · JioMart  │  CPI series        │
+│  (scrapers, or simulator as fallback)   │  (simulated)       │
+└──────────────────────────────┬───────────────────────────────┘
+                               ▼
+┌──────────────────────────────────────────────────────────────┐
+│                      INGESTION PIPELINE                      │
+│  Extract → Validate → Deduplicate → Upsert                   │
+│  APScheduler daily run · per-retailer fallback · run logs    │
+└──────────────────────────────┬───────────────────────────────┘
+                               ▼
+┌──────────────────────────────────────────────────────────────┐
+│                  POSTGRESQL STAR SCHEMA                      │
+│  dim_retailer · dim_product · dim_category                   │
+│  fact_price_history (daily) · fact_macro_cpi (monthly)       │
+└──────────────────────────────┬───────────────────────────────┘
+                               ▼
+┌──────────────────────────────────────────────────────────────┐
+│                  ANALYTICAL SQL LAYER (20 views)             │
+│  Promotions · Price gaps · Volatility · Elasticity           │
+│  Demand proxies · Inflation pass-through · Price indices     │
+└──────────────────────────────┬───────────────────────────────┘
+                               ▼
+┌──────────────────────────────────────────────────────────────┐
+│                        PRESENTATION                          │
+│  Streamlit dashboard · Jupyter EDA · Power BI guide          │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Key Features
+## Dashboard
 
-### 1. Automated Daily Price Tracking
-- Modular scrapers for **BigBasket**, **Blinkit**, **Zepto**, and **JioMart**
-- Scheduled via `APScheduler` to run daily, building a growing time-series dataset
-- Tracks **75 SKUs** (extensible via the product catalog) across groceries, FMCG, dairy, snacks, and personal care
+A Streamlit + Plotly app with three pages. Category and retailer filters are shared across all of them.
 
-### 2. Normalized PostgreSQL Schema
-- Star-schema design with dimension tables (`dim_retailer`, `dim_product`, `dim_category`) and fact tables (`fact_price_history`, `fact_macro_cpi`)
-- Indexed for fast analytical queries across millions of price observations
-- Full price history with timestamps — no data is ever overwritten
+| Page | Answers | Contents |
+|---|---|---|
+| **Executive** | *Where do we stand in the market?* | KPI row, cheapest-retailer share, retailer price-premium matrix, discount vs CPI inflation, demand signals |
+| **Operational** | *What changed today?* | Searchable price board with the lowest price highlighted, per-product price history, price-drop alerts, stockout watchlist, most volatile SKUs |
+| **Trends** | *How are prices moving?* | Category price index, weekly discount by retailer, week-over-week and day-of-week heatmaps, promotional calendar timeline |
 
-### 3. Interview-Ready SQL Analytics (20 Queries)
-| Query | Technique |
-|---|---|
-| Promotion detection (>15% price drops) | `LAG()` window function |
-| Week-over-week price change | `LAG()` + `PARTITION BY` |
-| Retailer discount frequency by day-of-week | Conditional aggregation |
-| Competitive price gap (BigBasket vs JioMart) | Self-join + CTEs |
-| Category-level demand proxy | Availability signal aggregation |
-| Inflation-adjusted pricing trends | CPI join + indexed calculation |
-| Promotional calendar reconstruction | Gap-and-island detection |
-| Price elasticity estimation by category | Regression via window functions |
-| Market basket correlation | Cross-category co-movement analysis |
-| Weekend vs weekday discount patterns | `EXTRACT(DOW)` + `CASE WHEN` |
-
-### 4. Macro Context — Government CPI Data
-- Monthly Consumer Price Index data from [data.gov.in](https://data.gov.in)
-- Enables inflation-adjusted price trend analysis
-- Answers: *"Are retailers absorbing inflation or passing it to consumers?"*
-
-### 5. Power BI Dashboard (3 Views)
-- **Executive View**: Market share proxy by category, price index vs competitors, inflation impact summary
-- **Operational View**: Daily SKU-level price alerts, competitor price drop notifications
-- **Trend View**: 90-day historical pricing charts with promotion overlays and CPI trend lines
+```bash
+streamlit run dashboard/app.py
+```
 
 ---
 
-## Business Intelligence Highlights
+## Sample Findings
 
-> *These are the types of insights the platform surfaces — the kind of analysis retail DA teams deliver weekly.*
+These come from the bundled simulated dataset and show the kind of output the platform produces:
 
-- **Blinkit discounts dairy products 40% more aggressively on weekends** compared to weekdays
-- **BigBasket maintains a consistent 8-12% price premium** over JioMart in staples
-- **Zepto runs 3-day promotional cycles** in snacks — detectable through price drop pattern analysis
-- **Cooking oil prices rose 18% across all retailers** in Q1, outpacing the 6.2% CPI food inflation rate
-- **When rice prices drop >10%, dal purchases increase 15%** — market basket correlation signal
+- **JioMart wins on price:** it had the lowest in-stock price on **66%** of product-days, against Blinkit 17%, Zepto 11% and BigBasket 6%.
+- **The gap is about 11–12%:** the median basket at BigBasket, Blinkit or Zepto costs 11–12% more than at JioMart. The other three retailers sit within about 2% of each other.
+- **Discount depth separates the strategies:** average discounts are JioMart 21.9%, Blinkit 17.6%, Zepto 15.2% and BigBasket 12.9%.
+- **Weekends are promotional:** all four retailers discount deepest on Saturday and Sunday. For example, JioMart goes from 19% on Monday to 25.7% on Saturday.
+- **Availability is high:** 3.3% of retailer-product-days were out of stock over the last 30 days.
+
+---
+
+## SQL Analytics
+
+All 20 views live in [`database/views/analytical_views.sql`](database/views/analytical_views.sql). Each one is also a standalone, documented file in [`sql_queries/`](sql_queries/) that states the business question it answers.
+
+| Analysis | Technique |
+|---|---|
+| Promotion detection (>15% day-over-day drop) | `LAG()` window function |
+| Week-over-week price change | `LAG()` + `DATE_TRUNC` |
+| Competitive price gap between retailers | Self-join + CTEs |
+| Promotional calendar reconstruction | Gap-and-island detection |
+| Cheapest-retailer frequency | `RANK()` + conditional counting |
+| Inflation-adjusted pricing | CPI join + real-price calculation |
+| Price elasticity estimate by category | `LAG()` over daily aggregates |
+| Cross-category price correlation | Closed-form Pearson via self-join |
+| Weekend vs weekday discounting | `EXTRACT(DOW)` + `CASE WHEN` |
+| Category price index (day 1 = 100) | `FIRST_VALUE()` + 7-day moving average |
+
+<details>
+<summary><b>Example: promotion detection</b></summary>
+
+```sql
+WITH price_changes AS (
+    SELECT
+        p.product_name,
+        r.retailer_name,
+        f.price_date,
+        f.selling_price,
+        LAG(f.selling_price) OVER (
+            PARTITION BY f.product_id, f.retailer_id
+            ORDER BY f.price_date
+        ) AS prev_day_price
+    FROM fact_price_history f
+    JOIN dim_product p  ON f.product_id = p.product_id
+    JOIN dim_retailer r ON f.retailer_id = r.retailer_id
+    WHERE f.is_available
+)
+SELECT
+    product_name,
+    retailer_name,
+    price_date,
+    prev_day_price,
+    selling_price,
+    ROUND((prev_day_price - selling_price) / prev_day_price * 100, 2) AS pct_drop
+FROM price_changes
+WHERE prev_day_price IS NOT NULL
+  AND (prev_day_price - selling_price) / prev_day_price > 0.15
+ORDER BY price_date DESC, pct_drop DESC;
+```
+
+</details>
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.11+
+- PostgreSQL 16 (local install or Docker)
+
+### Setup
+
+```bash
+git clone https://github.com/justinthomas11/shelfsense-retail-intelligence.git
+cd shelfsense-retail-intelligence
+
+python -m venv venv
+source venv/bin/activate          # Windows: .\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+
+# Database connection
+cp config/db_config.example.py config/db_config.py
+cp .env.example .env              # edit credentials if needed
+
+# Start PostgreSQL (skip if installed locally)
+docker compose up -d
+
+# Create tables, load 90 days of simulated data, build all 20 views
+python scripts/setup_database.py --with-data
+
+# Launch the dashboard
+streamlit run dashboard/app.py
+```
+
+### Daily pipeline
+
+```bash
+python pipeline/scheduler.py --once --source simulate      # offline run
+python pipeline/scheduler.py --once --fallback-simulate    # live scrapers, simulate blocked retailers
+python pipeline/scheduler.py --hour 6 --minute 0           # run every day at 06:00 IST
+```
+
+Live scraping of Blinkit and Zepto also needs `playwright install chromium`. Run logs go to `logs/pipeline.log`.
+
+### Tests
+
+```bash
+pytest
+```
+
+Unit tests run offline. Integration tests check that every view returns rows, plus data-quality rules; they run when a database is reachable and are skipped otherwise. CI runs the whole stack on every push: it builds the warehouse on PostgreSQL 16, runs the pipeline, then runs all tests.
 
 ---
 
@@ -135,205 +203,48 @@ In modern retail, **pricing is the single biggest lever for revenue and margin**
 
 ```
 shelfsense-retail-intelligence/
-│
-├── config/                     # Database connection settings
-│   └── db_config.example.py    # copy to db_config.py (gitignored)
-│
+├── config/              # DB connection template (reads .env)
 ├── database/
-│   ├── schema/                 # DDL + dimension seed scripts
-│   │   ├── 01_create_tables.sql
-│   │   └── 02_seed_dimensions.sql
-│   └── views/                  # 20 analytical views for Power BI
-│       └── analytical_views.sql
-│
-├── scrapers/                   # One module per retailer
-│   ├── base_scraper.py         # fetching, retries, parsing, catalog matching
-│   ├── bigbasket_scraper.py
-│   ├── blinkit_scraper.py      # Playwright (JS-rendered)
-│   ├── zepto_scraper.py        # Playwright (JS-rendered)
-│   └── jiomart_scraper.py
-│
-├── data_simulator/             # Realistic data generation (fallback)
-│   ├── product_catalog.py      # 75 SKUs across 20 categories
-│   ├── simulate_prices.py      # 90 days of price history
-│   └── load_cpi.py             # monthly CPI / inflation series
-│
-├── pipeline/                   # Extract → validate → load, scheduled daily
-│   ├── scheduler.py
-│   ├── validation.py
-│   ├── loader.py
-│   └── simulated_source.py
-│
-├── sql_queries/                # 20 standalone, documented analytical queries
-│   ├── 01_daily_competitor_pricing.sql
-│   ├── 05_promotion_detection.sql
-│   ├── 11_promotional_calendar.sql
-│   └── ...
-│
-├── scripts/
-│   └── setup_database.py       # one-command DB bootstrap
-│
-├── powerbi/                    # Dashboard build guide & exports
-│   ├── dashboard_guide.md
-│   └── screenshots/
-│
-├── dashboard/                  # Streamlit app (Executive / Operational / Trends)
-│   ├── app.py
-│   └── views/
-│
-├── notebooks/                  # Jupyter EDA
-│   └── data_exploration.ipynb
-│
-├── tests/                      # pytest: offline unit tests + DB integration tests
-├── .github/workflows/ci.yml    # CI: build warehouse, run pipeline, run tests
-├── requirements.txt
-├── docker-compose.yml          # PostgreSQL via Docker (optional)
-└── README.md
+│   ├── schema/          # DDL + dimension seed data
+│   └── views/           # 20 analytical views
+├── scrapers/            # BaseScraper + one module per retailer
+├── data_simulator/      # product catalog, price simulator, CPI loader
+├── pipeline/            # scheduler, validation, loader, simulated source
+├── sql_queries/         # 20 standalone, documented queries
+├── dashboard/           # Streamlit app (Executive / Operational / Trends)
+├── notebooks/           # Jupyter EDA
+├── powerbi/             # Power BI build guide
+├── scripts/             # one-command database setup
+├── tests/               # unit + integration tests
+└── .github/workflows/   # CI
 ```
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology | Purpose |
-|---|---|---|
-| **Language** | Python 3.11+ | Scraping, data processing, orchestration |
-| **Database** | PostgreSQL 16 | Normalized data warehouse for price history |
-| **Scraping** | BeautifulSoup, Playwright | Web data extraction from retailer sites |
-| **Scheduling** | APScheduler | Automated daily pipeline execution |
-| **Data Processing** | Pandas, NumPy | Transformation, validation, loading |
-| **ORM / DB Driver** | SQLAlchemy, psycopg2 | Python ↔ PostgreSQL connectivity |
-| **Testing** | pytest | Offline unit tests for scrapers, pipeline and SQL |
-| **Visualization** | Streamlit + Plotly, Power BI | Interactive executive, operational & trend dashboards |
-| **Version Control** | Git + GitHub | Code versioning & collaboration |
+| Layer | Technology |
+|---|---|
+| Language | Python 3.11+ |
+| Database | PostgreSQL 16 (star schema) |
+| Ingestion | requests, BeautifulSoup, Playwright, APScheduler |
+| Processing | pandas, NumPy |
+| DB access | SQLAlchemy, psycopg2 |
+| Dashboard | Streamlit, Plotly |
+| Testing & CI | pytest, GitHub Actions |
+| BI | Power BI (build guide) |
 
 ---
 
-## Getting Started
+## Roadmap
 
-### Prerequisites
-- Python 3.11+
-- PostgreSQL 16 (local install or Docker)
-- Power BI Desktop (for dashboard)
-
-### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/justinthomas11/shelfsense-retail-intelligence.git
-cd shelfsense-retail-intelligence
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate        # Linux/Mac
-.\venv\Scripts\Activate.ps1     # Windows
-
-# Install dependencies
-pip install -r requirements.txt
-playwright install chromium     # only needed for live Blinkit/Zepto scraping
-
-# Configure the database connection
-cp config/db_config.example.py config/db_config.py
-cp .env.example .env            # then edit your credentials
-
-# Start PostgreSQL (skip if installed locally)
-docker compose up -d
-
-# Create tables, load 90 days of simulated data, and build all views
-python scripts/setup_database.py --with-data
-```
-
-### Running the pipeline
-
-```bash
-# One-off run with live scrapers, simulating any retailer that returns no data
-python pipeline/scheduler.py --once --fallback-simulate
-
-# Offline / demo run
-python pipeline/scheduler.py --once --source simulate
-
-# Long-running daily schedule (06:00 IST by default)
-python pipeline/scheduler.py --hour 6 --minute 0
-```
-
-Run logs are written to `logs/pipeline.log`.
-
-> **About the data:** retailer storefronts change markup often and some block automated traffic, so the scrapers keep their CSS selectors in a single `SELECTORS` dict per retailer for easy updates. The bundled dataset is produced by the simulator, which models each retailer's discount strategy, weekend and sale-event promotions, stockouts and inflation. The insights above describe what the platform can surface; they are not claims about real retailer behaviour.
-
-### Running the tests
-
-```bash
-pytest
-```
-
-Unit tests run offline. Integration tests (every view returns rows, data-quality checks) run automatically when the configured database is reachable and are skipped otherwise. CI runs the full stack on every push: it builds the warehouse on PostgreSQL 16, runs the pipeline, then runs all tests.
-
-### Exploring the data
-
-- **Streamlit dashboard:** run `streamlit run dashboard/app.py` and open http://localhost:8501. It has three pages, all sharing the same category and retailer filters:
-  - **Executive:** KPI row, cheapest-retailer share, retailer price-premium matrix, discount vs CPI inflation, demand signals
-  - **Operational:** today's price board with the lowest price highlighted, per-product price history, price-drop alerts, stockout watchlist, most volatile SKUs
-  - **Trends:** category price index, weekly discount by retailer, week-over-week and day-of-week heatmaps, promotional calendar
-- **Notebook:** `notebooks/data_exploration.ipynb` charts discounts, cheapest-retailer share, price indices, volatility and inflation strategy straight from the views.
-- **Power BI:** see [`powerbi/dashboard_guide.md`](powerbi/dashboard_guide.md) for the connection steps, the visual-to-view mapping for all three pages, and DAX measures.
-
----
-
-## Sample SQL — Promotion Detection
-
-```sql
--- Detect promotional price drops (>15% decrease from previous day)
-WITH price_changes AS (
-    SELECT
-        p.product_name,
-        r.retailer_name,
-        ph.price_date,
-        ph.selling_price,
-        LAG(ph.selling_price) OVER (
-            PARTITION BY ph.product_id, ph.retailer_id
-            ORDER BY ph.price_date
-        ) AS prev_price
-    FROM fact_price_history ph
-    JOIN dim_product p ON ph.product_id = p.product_id
-    JOIN dim_retailer r ON ph.retailer_id = r.retailer_id
-)
-SELECT
-    product_name,
-    retailer_name,
-    price_date,
-    prev_price,
-    selling_price,
-    ROUND((prev_price - selling_price) / prev_price * 100, 1) AS pct_drop
-FROM price_changes
-WHERE prev_price IS NOT NULL
-  AND (prev_price - selling_price) / prev_price > 0.15
-ORDER BY price_date DESC, pct_drop DESC;
-```
-
----
-
-## Why This Project Matters
-
-This project demonstrates the **complete analytical workflow** used by retail data analytics teams:
-
-1. **Data Engineering** — Automated ingestion pipelines with scheduling and error handling
-2. **Data Modeling** — Normalized star-schema designed for analytical workloads
-3. **Advanced SQL** — Window functions, CTEs, conditional aggregation, gap-and-island detection
-4. **Business Acumen** — Domain-specific insights around pricing strategy, promotion effectiveness, and competitive positioning
-5. **Data Visualization** — Multi-audience dashboarding (executive, operational, trend)
-
-> *An interviewer at a retail company sees this and thinks: "This person already understands competitive price intelligence — that's the job."*
+- [ ] Validate scraper selectors against the live storefronts
+- [ ] Load real CPI data from MoSPI / data.gov.in
+- [ ] Deploy the dashboard publicly (Streamlit Community Cloud + hosted Postgres)
+- [ ] Build the Power BI report from [`powerbi/dashboard_guide.md`](powerbi/dashboard_guide.md)
 
 ---
 
 ## License
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
-
----
-
-<div align="center">
-
-**Built for learning. Designed for impact. Ready for the interview.**
-
-</div>
+MIT. See [LICENSE](LICENSE).
