@@ -23,3 +23,7 @@ pytest>=8.0.0
 # Notebooks & visualization
 matplotlib>=3.8.0
 jupyter>=1.0.0
+
+# Dashboard
+streamlit>=1.46.0
+plotly>=5.20.0

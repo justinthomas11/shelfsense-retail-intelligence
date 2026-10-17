@@ -34,16 +34,16 @@ SELECT
     product_name,
     brand,
     category_name,
-    MAX(CASE WHEN retailer_name = 'BigBasket' THEN selling_price END) AS bigbasket_price,
-    MAX(CASE WHEN retailer_name = 'Blinkit' THEN selling_price END) AS blinkit_price,
-    MAX(CASE WHEN retailer_name = 'Zepto' THEN selling_price END) AS zepto_price,
-    MAX(CASE WHEN retailer_name = 'JioMart' THEN selling_price END) AS jiomart_price,
+    MAX(CASE WHEN retailer_name = 'BigBasket' AND is_available THEN selling_price END) AS bigbasket_price,
+    MAX(CASE WHEN retailer_name = 'Blinkit' AND is_available THEN selling_price END) AS blinkit_price,
+    MAX(CASE WHEN retailer_name = 'Zepto' AND is_available THEN selling_price END) AS zepto_price,
+    MAX(CASE WHEN retailer_name = 'JioMart' AND is_available THEN selling_price END) AS jiomart_price,
     -- Calculate the lowest price across all retailers for this item
     LEAST(
-        MAX(CASE WHEN retailer_name = 'BigBasket' THEN selling_price END),
-        MAX(CASE WHEN retailer_name = 'Blinkit' THEN selling_price END),
-        MAX(CASE WHEN retailer_name = 'Zepto' THEN selling_price END),
-        MAX(CASE WHEN retailer_name = 'JioMart' THEN selling_price END)
+        MAX(CASE WHEN retailer_name = 'BigBasket' AND is_available THEN selling_price END),
+        MAX(CASE WHEN retailer_name = 'Blinkit' AND is_available THEN selling_price END),
+        MAX(CASE WHEN retailer_name = 'Zepto' AND is_available THEN selling_price END),
+        MAX(CASE WHEN retailer_name = 'JioMart' AND is_available THEN selling_price END)
     ) AS lowest_market_price
 FROM latest_prices
 GROUP BY product_name, brand, category_name

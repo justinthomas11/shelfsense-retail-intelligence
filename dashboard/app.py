@@ -1,0 +1,30 @@
+"""
+ShelfSense — Streamlit Dashboard
+=================================
+Usage:
+    streamlit run dashboard/app.py
+"""
+
+import sys
+from pathlib import Path
+
+import streamlit as st
+
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from dashboard.data import require_connection, sidebar_filters  # noqa: E402
+
+st.set_page_config(page_title="ShelfSense", page_icon="🛒", layout="wide")
+
+PAGES = Path(__file__).parent / "pages"
+nav = st.navigation([
+    st.Page(PAGES / "executive.py", title="Executive", icon=":material/insights:", default=True),
+])
+
+st.sidebar.title("🛒 ShelfSense")
+st.sidebar.caption("Competitive retail price intelligence")
+require_connection()
+st.session_state["filters"] = sidebar_filters()
+nav.run()
